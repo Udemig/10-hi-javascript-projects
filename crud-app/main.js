@@ -11,6 +11,17 @@ const submitBtn = document.querySelector(".submit-btn");
 const clearBtn = document.querySelector(".clear-btn");
 
 //! Fonksiyonlar
+
+const editItem = (e) => {
+  const element = e.target.parentElement.parentElement.parentElement;
+  editElement = e.target.parentElement.parentElement.previousElementSibling; //* Düzenleme yapacağımız etiketi seçtik.
+  grocery.value = editElement.innerText; //* Düzenlediğimiz etiketin içeriğini inputa aktardık.
+  editFlag = true;
+  editID = element.dataset.id; //* Düzenlenen öğenin kimliğini gönderdik.
+  submitBtn.textContent = "Düzenle"; //* Düzenle butonuna tıklanıldığında Ekle butonu Düzenle olarak değişsin.
+  console.log(editID);
+};
+
 //* Ekrana bildirim bastıracak fonksiyondur.
 const displayAlert = (text, action) => {
   alert.textContent = text; //* alert classlı etiketin içerisini dışardan gönderilen parametre ile değiştirdik.
@@ -20,13 +31,6 @@ const displayAlert = (text, action) => {
     alert.textContent = ""; //* p etiketinin içerisini boş stringe çevirdik
     alert.classList.remove(`alert-${action}`); //* Eklediğimiz classı kaldırdık.
   }, 2000);
-};
-//* Varsayılan değerlere dönderir.
-const setBackToDefault = () => {
-  grocery.value = "";
-  editFlag = false;
-  editID = "";
-  submitBtn.textContent = "Ekle";
 };
 
 const addItem = (e) => {
@@ -66,25 +70,28 @@ const addItem = (e) => {
   } else if (value !== "" && editFlag) {
     editElement.innerText = value; //* Güncelleyeceğimiz elemanın içeriğini değiştirdik.
     displayAlert("Başarıyla Değiştirildi", "success");
+    console.log(editID);
+    editLocalStore(editID, value);
     setBackToDefault();
   }
 };
 
+//* Varsayılan değerlere dönderir.
+const setBackToDefault = () => {
+  grocery.value = "";
+  editFlag = false;
+  editID = "";
+  submitBtn.textContent = "Ekle";
+};
 //* Silme butonuna tıklanıldığında çalışır.
 const deleteItem = (e) => {
   const element = e.target.parentElement.parentElement.parentElement; //* Sileceğimiz etikete kapsayıcıları yardımı ile ulaştık.
+  const id = element.dataset.id;
   console.log(element);
   list.removeChild(element); //* Bulduğumuz "article" etiketini list alanı içerisinden kaldırdık.
   displayAlert("Başarıyla Kaldırıldı", "danger"); //* Ekrana gönderdiğimiz parametrelere göre bildirim bastırır.
-};
 
-const editItem = (e) => {
-  const element = e.target.parentElement.parentElement.parentElement;
-  editElement = e.target.parentElement.parentElement.previousElementSibling; //* Düzenleme yapacağımız etiketi seçtik.
-  grocery.value = editElement.innerText; //* Düzenlediğimiz etiketin içeriğini inputa aktardık.
-  editFlag = true;
-  editID = element.dataset.id; //* Düzenlenen öğenin kimliğini gönderdik.
-  submitBtn.textContent = "Düzenle"; //* Düzenle butonuna tıklanıldığında Ekle butonu Düzenle olarak değişsin.
+  removeFromLocalStorage(id);
 };
 
 const clearItems = () => {
@@ -93,13 +100,79 @@ const clearItems = () => {
   if (items.length > 0) {
     items.forEach((item) => list.removeChild(item)); //* forEach ile dizi içerisinde bulunan her bir elemanı dönüp her bir öğeyi listeden kaldırdık.
   }
-  displayAlert("Liste Boş", "danger");
-};
 
+  displayAlert("Liste Boş", "danger");
+  localStorage.removeItem("list");
+};
+// Yerel depoya öğe ekleme işlemi
 const addToLocalStorage = (id, value) => {
   const grocery = { id, value };
+  let items = getLocalStorage();
+  items.push(grocery);
+  console.log(items);
+  localStorage.setItem("list", JSON.stringify(items));
+};
+// Yerel depodan öğeleri alma işlemi
+function getLocalStorage() {
+  return localStorage.getItem("list")
+    ? JSON.parse(localStorage.getItem("list"))
+    : [];
+}
+// Yerel depodan idsine göre silme işlemi
+const removeFromLocalStorage = (id) => {
+  let items = getLocalStorage();
+  items = items.filter((item) => item.id !== id);
+  localStorage.setItem("list", JSON.stringify(items));
+};
 
-  localStorage.setItem("list", JSON.stringify(grocery));
+const editLocalStore = (id, value) => {
+  let items = getLocalStorage();
+
+  items = items.map((item) => {
+    if (item.id === id) {
+      item.value = value;
+    }
+    return item;
+  });
+  console.log(items);
+  localStorage.setItem("list", JSON.stringify(items));
+};
+
+// Gönderilen id ve value(değer) sahip bir öğe oluşturan fonksiyon
+const createListItem = (id, value) => {
+  const element = document.createElement("article"); //* Yeni bir "article" öğesi oluştur.
+  let attr = document.createAttribute("data-id"); //* Yeni bir veri kimliği oluştur.
+  attr.value = id;
+  element.setAttributeNode(attr); //* Oluşturduğumuz idyi data özellik olarak set ettik.
+  element.classList.add("grocery-item"); //* article etiketine class ekledik
+
+  element.innerHTML = `
+        <p class="title">${value}</p>
+        <div class="btn-container">
+            <button type="button" class="edit-btn">
+                <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button type="button" class="delete-btn">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </div>
+    `;
+  //* Oluşturduğumuz bu butonlara olay izleyicileri ekleyebilmemiz için seçtik.
+  const deleteBtn = element.querySelector(".delete-btn");
+  deleteBtn.addEventListener("click", deleteItem);
+  const editBtn = element.querySelector(".edit-btn");
+  editBtn.addEventListener("click", editItem);
+  list.appendChild(element); //* Oluşturduğumuz "article" etiketini htmle ekledik.
+};
+
+const setupItems = () => {
+  let items = getLocalStorage();
+
+  if (items.length > 0) {
+    items.forEach((item) => {
+      createListItem(item.id, item.value);
+    });
+  }
 };
 
 //! Olay İzleyicileri
@@ -107,3 +180,4 @@ const addToLocalStorage = (id, value) => {
 //* Form gönderildiğinde addItem fonksiyonu çalışır.
 form.addEventListener("submit", addItem);
 clearBtn.addEventListener("click", clearItems);
+window.addEventListener("DOMContentLoaded", setupItems);
